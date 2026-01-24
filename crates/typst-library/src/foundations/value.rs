@@ -15,8 +15,8 @@ use crate::diag::{DeprecationSink, HintedStrResult, HintedString, StrResult};
 use crate::foundations::{
     Args, Array, AutoValue, Bytes, CastInfo, Content, Datetime, Decimal, Dict, Duration,
     Fold, FromValue, Func, IntoValue, Label, Module, NativeElement, NativeType,
-    NoneValue, Reflect, Repr, Resolve, Scope, Str, Styles, Symbol, SymbolElem, Type,
-    Version, fields, ops, repr,
+    NoneValue, Reflect, Repr, Resolve, Scope, SpannedStr, Str, Styles, Symbol, SymbolElem,
+    Type, Version, fields, ops, repr,
 };
 use crate::layout::{Abs, Angle, Em, Fr, Length, Ratio, Rel};
 use crate::text::{RawContent, RawElem, TextElem};
@@ -57,7 +57,7 @@ pub enum Value {
     /// A version.
     Version(Version),
     /// A string: `"string"`.
-    Str(Str),
+    Str(SpannedStr),
     /// Raw bytes.
     Bytes(Bytes),
     /// A label: `<intro>`.
@@ -196,7 +196,16 @@ impl Value {
             Self::Int(v) => TextElem::packed(repr::format_int_with_base(v, 10)),
             Self::Float(v) => TextElem::packed(repr::display_float(v)),
             Self::Decimal(v) => TextElem::packed(eco_format!("{v}")),
-            Self::Str(v) => TextElem::packed(v),
+            Self::Str(v) => {
+                let mut content = TextElem::packed(v.text().clone());
+                if !v.span().is_detached() {
+                    content = content.spanned(v.span());
+                    if v.span_offset() > 0 {
+                        content = content.set(TextElem::span_offset, v.span_offset());
+                    }
+                }
+                content
+            }
             Self::Version(v) => TextElem::packed(eco_format!("{v}")),
             Self::Symbol(v) => SymbolElem::packed(v.get()),
             Self::Content(v) => v,
@@ -633,10 +642,40 @@ primitive! { Gradient: "gradient", Gradient }
 primitive! { Tiling: "tiling", Tiling }
 primitive! { Symbol: "symbol", Symbol }
 primitive! { Version: "version", Version }
-primitive! {
-    Str: "string",
-    Str,
-    Symbol(symbol) => symbol.get().into()
+impl Reflect for Str {
+    fn input() -> CastInfo {
+        CastInfo::Type(Type::of::<Self>())
+    }
+
+    fn output() -> CastInfo {
+        CastInfo::Type(Type::of::<Self>())
+    }
+
+    fn castable(value: &Value) -> bool {
+        matches!(value, Value::Str(_) | Value::Symbol(_))
+    }
+}
+
+impl IntoValue for Str {
+    fn into_value(self) -> Value {
+        Value::Str(SpannedStr::from(self))
+    }
+}
+
+impl FromValue for Str {
+    fn from_value(value: Value) -> HintedStrResult<Self> {
+        match value {
+            Value::Str(v) => Ok(v.into_text()),
+            Value::Symbol(symbol) => Ok(symbol.get().into()),
+            v => Err(<Self as Reflect>::error(&v)),
+        }
+    }
+}
+
+impl IntoValue for SpannedStr {
+    fn into_value(self) -> Value {
+        Value::Str(self)
+    }
 }
 primitive! { Bytes: "bytes", Bytes }
 primitive! { Label: "label", Label }

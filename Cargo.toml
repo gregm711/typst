@@ -4,7 +4,7 @@ default-members = ["crates/typst-cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.14.1"
+version = "0.14.2"
 rust-version = "1.89" # also change in ci.yml
 authors = ["The Typst Project Developers"]
 edition = "2024"

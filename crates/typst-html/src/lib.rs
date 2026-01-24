@@ -10,7 +10,7 @@ mod encode;
 mod fragment;
 mod link;
 mod rules;
-mod tag;
+pub mod tag;
 mod typed;
 
 pub use self::document::html_document;

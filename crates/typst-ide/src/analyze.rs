@@ -2,10 +2,11 @@ use comemo::Track;
 use ecow::{EcoString, EcoVec, eco_vec};
 use rustc_hash::FxHashSet;
 use typst::AsDocument;
-use typst::foundations::{Label, Styles, Value};
+use typst::foundations::{Label, SpannedStr, Styles, Value};
 use typst::layout::PagedDocument;
 use typst::model::{BibliographyElem, FigureElem};
 use typst::syntax::{LinkedNode, SyntaxKind, ast};
+use typst::syntax::ast::AstNode;
 
 use crate::IdeWorld;
 
@@ -25,7 +26,9 @@ pub fn analyze_expr(
         ast::Expr::Int(v) => Value::Int(v.get()),
         ast::Expr::Float(v) => Value::Float(v.get()),
         ast::Expr::Numeric(v) => Value::numeric(v.get()),
-        ast::Expr::Str(v) => Value::Str(v.get().into()),
+        ast::Expr::Str(v) => {
+            Value::Str(SpannedStr::new(v.get().into()).with_span(v.span(), 1))
+        }
         _ => {
             if node.kind() == SyntaxKind::Contextual
                 && let Some(child) = node.children().next_back()

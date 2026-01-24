@@ -6,7 +6,7 @@ use std::ops::{Add, AddAssign, Deref, Range};
 use comemo::Tracked;
 use ecow::EcoString;
 use serde::{Deserialize, Serialize};
-use typst_syntax::Spanned;
+use typst_syntax::{Span, Spanned};
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -75,6 +75,55 @@ pub use crate::__format_str as format_str;
 #[derive(Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Str(EcoString);
+
+/// A string with optional source span metadata.
+///
+/// This is used internally to keep literal string spans for projection editing.
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct SpannedStr {
+    text: Str,
+    span: Span,
+    span_offset: usize,
+}
+
+impl SpannedStr {
+    pub fn new(text: Str) -> Self {
+        Self { text, span: Span::detached(), span_offset: 0 }
+    }
+
+    pub fn with_span(mut self, span: Span, span_offset: usize) -> Self {
+        self.span = span;
+        self.span_offset = span_offset;
+        self
+    }
+
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
+    pub fn span_offset(&self) -> usize {
+        self.span_offset
+    }
+
+    pub fn text(&self) -> &Str {
+        &self.text
+    }
+
+    pub fn into_text(self) -> Str {
+        self.text
+    }
+}
+
+impl Default for SpannedStr {
+    fn default() -> Self {
+        Self {
+            text: Str::default(),
+            span: Span::detached(),
+            span_offset: 0,
+        }
+    }
+}
 
 impl Str {
     /// Create a new, empty string.
@@ -806,6 +855,137 @@ impl From<Str> for EcoString {
 impl From<Str> for String {
     fn from(s: Str) -> Self {
         s.0.into()
+    }
+}
+
+impl From<SpannedStr> for EcoString {
+    fn from(s: SpannedStr) -> Self {
+        s.text.into()
+    }
+}
+
+impl From<SpannedStr> for String {
+    fn from(s: SpannedStr) -> Self {
+        s.text.into()
+    }
+}
+
+impl Deref for SpannedStr {
+    type Target = Str;
+
+    fn deref(&self) -> &Str {
+        &self.text
+    }
+}
+
+impl Debug for SpannedStr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        Debug::fmt(self.text.as_str(), f)
+    }
+}
+
+impl Display for SpannedStr {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        Display::fmt(self.text.as_str(), f)
+    }
+}
+
+impl Repr for SpannedStr {
+    fn repr(&self) -> EcoString {
+        self.text.repr()
+    }
+}
+
+impl PartialEq for SpannedStr {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text
+    }
+}
+
+impl Eq for SpannedStr {}
+
+impl PartialOrd for SpannedStr {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.text.partial_cmp(&other.text)
+    }
+}
+
+impl Ord for SpannedStr {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.text.cmp(&other.text)
+    }
+}
+
+impl Hash for SpannedStr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.text.hash(state);
+    }
+}
+
+impl Serialize for SpannedStr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.text.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SpannedStr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let text = Str::deserialize(deserializer)?;
+        Ok(Self::from(text))
+    }
+}
+
+impl AsRef<str> for SpannedStr {
+    fn as_ref(&self) -> &str {
+        self.text.as_ref()
+    }
+}
+
+impl Borrow<str> for SpannedStr {
+    fn borrow(&self) -> &str {
+        self.text.as_ref()
+    }
+}
+
+impl From<Str> for SpannedStr {
+    fn from(text: Str) -> Self {
+        Self::new(text)
+    }
+}
+
+impl From<char> for SpannedStr {
+    fn from(c: char) -> Self {
+        Self::from(Str::from(c))
+    }
+}
+
+impl From<&str> for SpannedStr {
+    fn from(s: &str) -> Self {
+        Self::from(Str::from(s))
+    }
+}
+
+impl From<EcoString> for SpannedStr {
+    fn from(s: EcoString) -> Self {
+        Self::from(Str::from(s))
+    }
+}
+
+impl From<String> for SpannedStr {
+    fn from(s: String) -> Self {
+        Self::from(Str::from(s))
+    }
+}
+
+impl From<Cow<'_, str>> for SpannedStr {
+    fn from(s: Cow<str>) -> Self {
+        Self::from(Str::from(s))
     }
 }
 
